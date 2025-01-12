@@ -1,0 +1,519 @@
+---
+title: "Project"
+author: "Shahrukh Varzgani"
+format: html
+editor: visual
+---
+
+# Library
+
+```{r}
+library(stringi)
+library(stringr)
+library(ggthemes)
+library(tm)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(tidytext)
+library(pdftools)
+library(dplyr)
+library(tidyverse)
+library(quanteda)
+library(quanteda.textmodels)
+library(quanteda.textplots)
+library(quanteda.textstats)
+library(quanteda.sentiment)
+library(quanteda.tidy)
+library(textdata)
+library(wordcloud)
+library(readtext)
+library(reshape2)
+library(janeaustenr)
+```
+
+# Jurassic Park
+
+```{r}
+Jurassic_park_data <- jurassic_park <- pdf_text("D:/American University/Text mining & Analytic/Jurassic_Park_Final.pdf")
+print(Jurassic_park_data)
+
+
+
+pdf_reader <- readPDF(engine = "pdftools")
+
+jurassic_corpus <- Corpus(URISource("D:/American University/Text mining & Analytic/Jurassic_Park_Final.pdf"), 
+                          readerControl = list(reader = pdf_reader))
+inspect(jurassic_corpus)
+
+```
+
+## DocumentTermMatrix of jurassic Park
+
+```{r}
+dtm <- DocumentTermMatrix(jurassic_corpus,control=list(weighting=weightTf))
+```
+
+## Frequcy table
+
+```{r}
+dtm.tweets.m <- as.matrix(dtm)
+term.freq <- rowSums(dtm.tweets.m)
+freq.df <- data.frame(word=names(term.freq),frequency=term.freq)
+freq.df <- freq.df[order(freq.df[,2],decreasing = T),]
+
+
+
+
+```
+
+```{r}
+freq.df$word <- factor(freq.df$word,levels = unique(as.character(freq.df$word)))
+ggplot(freq.df[1:20,], aes(x=word, y=frequency)) +
+geom_bar(stat="identity", fill="darkred") +
+coord_flip() +
+theme_gdocs() +
+geom_text(aes(label=frequency), colour="white",hjust=1.25, size=5.0)
+```
+
+## Tokenzing
+
+```{r}
+jurassic_park_text <- sapply(jurassic_corpus, content)
+jurassic_park_df <- tibble(page = 1:length(jurassic_park_text), text = jurassic_park_text)
+jurassic_park_df
+
+jurassic_tokens <- jurassic_park_df %>%
+  unnest_tokens(word, text)
+
+jurassic_tokens <- jurassic_tokens %>%
+anti_join(stop_words)
+jurassic_tokens
+
+jurassic_tokens %>%
+count(word, sort = TRUE)
+```
+
+## Word Frequency
+
+```{r}
+jurassic_tokens %>%
+count(word, sort = TRUE) %>%
+filter(n > 200) %>%
+mutate(word=reorder(word, n)) %>%
+ggplot(aes(word,n)) +
+geom_col() +
+xlab(NULL) +
+coord_flip()
+```
+
+# The Lost World
+
+```{r}
+The_lostworld_final_data <- pdf_text("D:/American University/Text mining & Analytic/The_Lost_World_Final.pdf")
+
+
+print(The_lostworld_final_data)
+
+pdf_reader <- readPDF(engine = "pdftools")
+
+The_lostworld_corpus <- Corpus(URISource("D:/American University/Text mining & Analytic/The_Lost_World_Final.pdf"), 
+                          readerControl = list(reader = pdf_reader))
+inspect(The_lostworld_corpus)
+
+```
+
+## DocumentTermMatrix of jurassic Park
+
+```{r}
+the_lostworld_dtm <- DocumentTermMatrix(The_lostworld_corpus,control=list(weighting=weightTf))
+```
+
+## Frequcy table
+
+```{r}
+dtm.the_lostworld.m <- as.matrix(the_lostworld_dtm)
+term.freq <- rowSums(dtm.the_lostworld.m)
+freq.df <- data.frame(word=names(term.freq),frequency=term.freq)
+freq.df <- freq.df[order(freq.df[,2],decreasing = T),]
+
+```
+
+## Tokenzing
+
+```{r}
+The_lostworld_text <- sapply(The_lostworld_corpus, content)
+The_lostworld_df <- tibble(page = 1:length(The_lostworld_text), text = The_lostworld_text)
+The_lostworld_df
+
+The_lostworld_tokens <- The_lostworld_df %>%
+  unnest_tokens(word, text)
+
+The_lostworld_tokens <- The_lostworld_tokens %>%
+anti_join(stop_words)
+The_lostworld_tokens
+
+The_lostworld_tokens %>%
+count(word, sort = TRUE)
+```
+
+## Word Frequency
+
+```{r}
+The_lostworld_tokens %>%
+count(word, sort = TRUE) %>%
+filter(n > 200) %>%
+mutate(word=reorder(word, n)) %>%
+ggplot(aes(word,n)) +
+geom_col() +
+xlab(NULL) +
+coord_flip()
+```
+
+# Comparision
+
+## Frequency Table
+
+```{r}
+frequency <- bind_rows(
+  mutate(jurassic_tokens, book = "Jurassic Park"),
+  mutate(The_lostworld_tokens, book = "The Lost World")
+) %>%
+  mutate(word = str_extract(word, "[a-z']+")) %>%
+  count(book, word) %>%  
+  group_by(book) %>%
+  mutate(proportion = n / sum(n)) %>% 
+  select(-n) %>%  
+  spread(book, proportion) %>%
+  gather(book, proportion, "Jurassic Park":"The Lost World")
+
+frequency <- frequency %>%
+  pivot_wider(names_from = book, values_from = proportion)
+```
+
+```{r}
+
+ggplot(frequency, aes(x = `The Lost World`*100, y = `Jurassic Park`*100, color = abs(`Jurassic Park` - `The Lost World`))) +
+  geom_abline(color = "gray40", lty = 2) +  
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) + 
+  scale_y_log10(labels = percent_format()) + 
+  scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+  theme(legend.position = "none") + 
+  labs(y = "Jurassic Park", x = "The Lost World")  
+```
+
+# Sentiment Analysis of Jurassic Park
+
+```{r}
+jurassic_corpus <- tm_map(jurassic_corpus, stripWhitespace)
+
+jurassic_corpus <- tm_map(jurassic_corpus, content_transformer(tolower))
+
+jurassic_corpus <- tm_map(jurassic_corpus, removeWords, tm::stopwords("english"))
+```
+
+```{r}
+myStopwords = c(tm::stopwords(),"")
+tdm3 = TermDocumentMatrix(jurassic_corpus,
+                                control = list(weighting = weightTfIdf,
+                                stopwords = myStopwords,
+                                removePunctuation = T,
+                                removeNumbers = T,
+                                stemming = T))
+
+dtm <- DocumentTermMatrix(jurassic_corpus)
+inspect(dtm)
+```
+
+```{r}
+findFreqTerms(dtm,5)
+```
+
+```{r}
+inspect(removeSparseTerms(dtm, 0.4))
+```
+
+```{r}
+inspect(DocumentTermMatrix(jurassic_corpus, list(dictionary = c("animal","dinosaur","chaos"))))
+```
+
+```{r}
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+```
+
+```{r}
+nrcfear <- get_sentiments("nrc") %>%
+filter(sentiment == "fear")
+```
+
+```{r}
+jurassic_tokens %>%
+inner_join(nrcfear) %>%
+count(word, sort = TRUE)
+```
+
+```{r}
+jurassic_tokens <- jurassic_tokens %>%
+  mutate(book = "Jurassic Park")
+
+lostworld_tokens <- The_lostworld_tokens %>%
+  mutate(book = "The Lost World")
+
+michael_crichton  <- bind_rows(jurassic_tokens, lostworld_tokens)%>%
+  mutate( auother = "Michael_Crichton") %>%
+  mutate(linenumber = row_number())
+```
+
+```{r}
+
+michael_crichtonsentiment <- michael_crichton %>%
+inner_join(get_sentiments("bing")) %>%
+count(book, index = linenumber %/% 80, sentiment) %>%
+spread(sentiment, n, fill = 0) %>%
+mutate(sentiment = positive - negative)
+```
+
+```{r}
+ggplot(michael_crichtonsentiment, aes(index, sentiment, fill = book)) +
+geom_col(show.legend = FALSE) +
+facet_wrap(~book, ncol = 2, scales = "free_x")
+```
+
+```{r}
+
+bing_word_counts <-michael_crichton %>%
+inner_join(get_sentiments("bing")) %>%
+count(word, sentiment, sort = TRUE) %>%
+ungroup()
+
+bing_word_counts
+View(bing_word_counts)
+
+
+bing_word_counts %>%
+  group_by(sentiment) %>%
+top_n(10) %>%
+ungroup() %>%
+mutate(word = reorder(word,n)) %>%
+ggplot(aes(word, n, fill = sentiment)) +
+geom_col(show.legend = FALSE) +
+facet_wrap(~sentiment, scales = "free_y") +
+labs(y = "Contribution to sentiment", x = NULL) +
+coord_flip()
+```
+
+```{r}
+michael_crichton %>%
+anti_join(stop_words) %>%
+count(word) %>%
+with(wordcloud(word, n, max.words = 100))
+```
+
+```{r}
+michael_crichton %>%
+inner_join(get_sentiments("bing")) %>%
+count(word, sentiment, sort = TRUE) %>%
+acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+comparison.cloud(colors = c("gray20","gray80"), max.words = 100)
+```
+
+# Jurassic Park
+
+```{r}
+
+jurassic_park_df <- tibble(line = 1:length(jurassic_park_text), text = jurassic_park_text)
+
+Jurassic_tf <- jurassic_tokens %>%
+  count(word, sort = TRUE) %>%
+  rename(term_frequency = n)
+
+
+jurassic_park_dtm <- jurassic_park_df %>%
+  unnest_tokens(word, text) %>%
+  count(line, word) %>%
+  bind_tf_idf(word, line, n)
+
+
+# Display the results: top TF-IDF words
+jurassic_park_dtm %>%
+  arrange(desc(tf_idf)) %>%
+  head(10) # Top 10 words with highest TF-IDF scores
+
+# Visualize the top terms
+jurassic_park_dtm %>%
+  arrange(desc(tf_idf)) %>%
+  top_n(15, tf_idf) %>%
+  ggplot(aes(tf_idf, reorder(word, tf_idf))) +
+  geom_col() +
+  labs(title = "Top TF-IDF Terms in Jurassic Park",
+       x = "TF-IDF Score",
+       y = "Terms") +
+  theme_minimal()
+```
+
+```{r}
+
+the_lost_world_df <- tibble(line = 1:length(The_lostworld_text), text = The_lostworld_text)
+
+the_lost_world_tf <- The_lostworld_tokens %>%
+  count(word, sort = TRUE) %>%
+  rename(term_frequency = n)
+
+
+the_lost_world_dtm <- the_lost_world_df %>%
+  unnest_tokens(word, text) %>%
+  count(line, word) %>%
+  bind_tf_idf(word, line, n)
+
+
+# Display the results: top TF-IDF words
+the_lost_world_dtm %>%
+  arrange(desc(tf_idf)) %>%
+  head(10) # Top 10 words with highest TF-IDF scores
+
+# Visualize the top terms
+the_lost_world_dtm %>%
+  arrange(desc(tf_idf)) %>%
+  top_n(15, tf_idf) %>%
+  ggplot(aes(tf_idf, reorder(word, tf_idf))) +
+  geom_col() +
+  labs(title = "Top TF-IDF Terms in The Lost World",
+       x = "TF-IDF Score",
+       y = "Terms") +
+  theme_minimal()
+
+
+word_freq <- The_lostworld_tokens %>%
+  count(word, sort = TRUE) %>%
+  mutate(rank = row_number(),  # Rank words by frequency
+         `frequency * rank` = n * rank)
+
+
+word_freq %>%
+  ggplot(aes(x = rank, y = n)) +
+  geom_point(color = "blue", alpha = 0.7) +
+  geom_line(color = "red", alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(title = "Zipf's Law Analysis for The Lost World",
+       x = "Log Rank",
+       y = "Log Term Frequency")
+```
+
+# Jurassic Park N-gram
+
+```{r}
+n <- 2
+jurassic_park_ngrams <- jurassic_park_df %>%
+  unnest_tokens(ngram, text, token = "ngrams", n = n)
+
+ngram_freq <- jurassic_park_ngrams %>%
+  count(ngram, sort = TRUE)
+
+
+ngram_freq %>%
+  slice_max(n, n = 15) %>%  # Top 15 n-grams
+  ggplot(aes(x = reorder(ngram, n), y = n)) +
+  geom_col(fill = "gray") +
+  coord_flip() +
+  labs(title = paste0("Top ", n, "-grams in Jurassic Park"),
+       x = "N-grams",
+       y = "Frequency") +
+  theme_minimal()
+
+# View the most frequent n-grams
+print(ngram_freq)
+```
+
+# Sub-Group Comparision
+
+```{r}
+books_df <- bind_rows(
+  tibble(line = 1:length(jurassic_park_text), text = jurassic_park_text, book = "Jurassic Park"),
+  tibble(line = 1:length(The_lostworld_text), text = The_lostworld_text, book = "The Lost World")
+)
+characters <- c("Grant", "Malcolm", "Ellie", "Hammond", "Ian", "Sarah")
+sentences_df <- books_df %>%
+  unnest_tokens(sentence, text, token = "sentences") 
+
+# Remove possessives and titles (e.g., "Dr.", "Grant's")
+sentences_df <- sentences_df %>%
+  mutate(sentence = str_replace_all(sentence, "\\b(dr\\.)\\s*", "")) %>%  # Remove "Dr."
+  mutate(sentence = str_replace_all(sentence, "'s", "")) 
+
+# Identify sentences with character mentions
+character_sentences <- sentences_df %>%
+  mutate(sentence = str_to_lower(sentence)) %>%  # Convert sentences to lowercase
+  filter(str_detect(sentence, paste(str_to_lower(characters), collapse = "|"))) %>%  # Filter sentences with character names
+  mutate(character = str_extract(sentence, paste(str_to_lower(characters), collapse = "|")))  # Extract character name
+
+
+characters <- c("Grant", "Malcolm", "Ellie", "Hammond", "Ian", "Sarah")
+
+
+character_sentiments <- character_sentences %>%
+  unnest_tokens(word, sentence) %>%  # Tokenize sentences into words
+  mutate(word = str_to_lower(word), 
+         word = str_remove_all(word, "[[:punct:]]")) %>%  # Preprocess words
+  inner_join(get_sentiments("bing"), by = "word") %>%  # Join with sentiment lexicon
+  count(book, character, sentiment, sort = TRUE) %>%  # Count sentiments by character and book
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%  # Convert to wide format
+  mutate(net_sentiment = positive - negative)
+
+
+butterfly_data <- character_sentiments %>%
+  select(book, character, positive, negative) %>%
+  pivot_longer(cols = c(positive, negative), names_to = "sentiment_type", values_to = "sentiment_value") %>%
+  mutate(sentiment_value = ifelse(book == "The Lost World", -sentiment_value, sentiment_value))  # Flip "The Lost World" values
+
+butterfly_data %>%
+  ggplot(aes(x = sentiment_value, y = character, fill = sentiment_type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +  # Side-by-side bars
+  labs(title = "Butterfly Chart: Sentiment Analysis of Characters",
+       x = "Sentiment Value",
+       y = "Character",
+       fill = "Sentiment Type") +
+  theme_minimal() +
+  scale_fill_manual(values = c("positive" = "blue", "negative" = "red")) +
+  theme(legend.position = "bottom")
+```
+
+# Sentiment towards technology
+
+```{r}
+target_words <- c("science", "nature", "technology")
+
+word_sentiments <- books_df %>%
+  unnest_tokens(sentence, text, token = "sentences") %>%
+  filter(str_detect(sentence, paste(target_words, collapse = "|"))) %>%  # Filter sentences with target words
+  mutate(target_word = str_extract(sentence, paste(target_words, collapse = "|"))) %>%  # Extract target word
+  unnest_tokens(word, sentence) %>%  # Tokenize sentences into words
+  mutate(word = str_to_lower(word),
+         word = str_remove_all(word, "[[:punct:]]")) %>%  # Preprocess words
+  inner_join(get_sentiments("bing"), by = "word") %>%  # Join with sentiment lexicon
+  count(book, target_word, sentiment) %>%  # Count sentiments by target word and book
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%  # Convert to wide format
+  mutate(net_sentiment = positive - negative)
+
+
+butterfly_data <- word_sentiments %>%
+  select(book, target_word, positive, negative) %>%
+  pivot_longer(cols = c(positive, negative), names_to = "sentiment_type", values_to = "sentiment_value") %>%
+  mutate(sentiment_value = ifelse(book == "The Lost World", -sentiment_value, sentiment_value))  # Flip one book's values
+
+# Create the butterfly chart
+butterfly_data %>%
+  ggplot(aes(x = sentiment_value, y = target_word, fill = sentiment_type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +  # Side-by-side bars
+  labs(title = "Butterfly Chart: Sentiment Analysis Towards Science, Nature, and Technology",
+       x = "Sentiment Value",
+       y = "Target Words",
+       fill = "Sentiment Type") +
+  theme_minimal() +
+  scale_fill_manual(values = c("positive" = "green", "negative" = "orange")) +
+  theme(legend.position = "bottom")
+```
